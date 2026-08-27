@@ -325,13 +325,15 @@
     // Prevent malicious downgrades
     // Note that we may not be able to do this for package installations, hence this code being done here
     NSString *hostVersion = [_host version];
+    BOOL allowsVersionDowngrades = [_host boolForInfoDictionaryKey:@"SUAllowsVersionDowngrades"];
     
     NSBundle *bundle = [NSBundle bundleWithPath:_bundlePath];
     SUHost *updateHost = [[SUHost alloc] initWithBundle:bundle];
     NSString *updateVersion = [updateHost objectForInfoDictionaryKey:(__bridge NSString *)kCFBundleVersionKey ofClass:NSString.class];
     
     id<SUVersionComparison> comparator = [[SUStandardVersionComparator alloc] init];
-    if (!updateVersion || [comparator compareVersion:hostVersion toVersion:updateVersion] == NSOrderedDescending) {
+    BOOL isVersionDowngrade = updateVersion != nil && [comparator compareVersion:hostVersion toVersion:updateVersion] == NSOrderedDescending;
+    if (!updateVersion || (isVersionDowngrade && !allowsVersionDowngrades)) {
         
         if (error != NULL) {
             NSString *errorMessage = [NSString stringWithFormat:@"For security reasons, updates that downgrade version of the application are not allowed. Refusing to downgrade app from version %@ to %@. Aborting update.", hostVersion, updateVersion];
