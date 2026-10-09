@@ -1,6 +1,6 @@
 # SakuraCord Sparkle fork
 
-This fork tracks Sparkle 2.9.6 and keeps its standard signed-feed, archive,
+This fork tracks Sparkle 2.10.0 and keeps its standard signed-feed, archive,
 bundle-identity, and installation verification.
 
 ## Explicit build selection
@@ -56,3 +56,11 @@ step: its tag-management script changes Git refs.
 Security regression coverage is in `SUAppcastTest` and `SUInstallerTest`.
 Run those suites together with `SUFeedSignatureVerifierTest` and
 `SUUpdateValidatorTest` using the Sparkle scheme.
+
+## Unreleased source updates
+
+The source includes upstream 2.10.0 and the explicit-selection compatibility-bound
+fix. CocoaPods support was removed with upstream. The SwiftPM manifest still
+resolves the last published fork binary, `2.9.6-sakuracord.3`; updating source alone
+does not publish a new binary or change SakuraCord’s pinned dependency. The next
+fork distribution is versioned `2.10.0-sakuracord.1`.

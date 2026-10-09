@@ -2,9 +2,9 @@ name: Build & Tests
 
 on:
   push:
-    branches: [ 2.x, master ]
+    branches: [ 2.x, master, explicit-build-selection ]
   pull_request:
-    branches: [ 2.x, master ]
+    branches: [ 2.x, master, explicit-build-selection ]
 
 jobs:
   build:
@@ -20,6 +20,14 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+      - name: Check Installer Progress localizations are up to date
+        run: |
+          python3 Configurations/generate_progress_tool_localizations.py
+          if [ -n "$(git status --porcelain -- Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h Sparkle/InstallerProgress/InstallerProgress-Info.plist)" ]; then
+            echo "::error::Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h or InstallerProgress-Info.plist is out of date. Run Configurations/generate_progress_tool_localizations.py and commit the result."
+            git diff -- Sparkle/InstallerProgress/SPUInstallerProgressLocalizedStrings.h Sparkle/InstallerProgress/InstallerProgress-Info.plist
+            exit 1
+          fi
       - name: Build Unit Tests
         run: |
           xcodebuild build-for-testing -project Sparkle.xcodeproj -scheme Distribution -enableCodeCoverage YES -derivedDataPath build
@@ -70,7 +78,7 @@ jobs:
           xcodebuild build -project Sparkle.xcodeproj -scheme Distribution -configuration Release -derivedDataPath build
       - name: Archive Test Results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-logs
           path: |
@@ -78,7 +86,7 @@ jobs:
             ~/Library/Logs/DiagnosticReports
       - name: Upload Distribution
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Sparkle-distribution-xcode27.tar.xz
           path: build/Build/Products/Release/sparkle_dist.tar.xz

@@ -51,10 +51,4 @@ static const char *SUAppleQuarantineIdentifier = "com.apple.quarantine";
 
 @end
 
-@interface SUBinaryDeltaUnarchiver (Private)
-
-+ (void)updateSpotlightImportersAtBundlePath:(NSString *)targetPath;
-
-@end
-
 NS_ASSUME_NONNULL_END
