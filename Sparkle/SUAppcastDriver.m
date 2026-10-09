@@ -85,7 +85,10 @@
 
 - (void)downloadDriverDidDownloadData:(SPUDownloadData *)downloadData
 {
-    SPUAppcastItemStateResolver *stateResolver = [[SPUAppcastItemStateResolver alloc] initWithHostVersion:_host.version applicationVersionComparator:[self versionComparator] standardVersionComparator:[SUStandardVersionComparator defaultComparator]];
+    // An exact selection bypasses update ordering, not version compatibility bounds.
+    // A host comparator that presents downgrades as upgrades must not reverse those bounds.
+    id<SUVersionComparison> compatibilityComparator = _explicitlyRequestedVersion != nil ? SUStandardVersionComparator.defaultComparator : [self versionComparator];
+    SPUAppcastItemStateResolver *stateResolver = [[SPUAppcastItemStateResolver alloc] initWithHostVersion:_host.version applicationVersionComparator:compatibilityComparator standardVersionComparator:[SUStandardVersionComparator defaultComparator]];
     
     NSData *downloadedAppcastData = downloadData.data;
     

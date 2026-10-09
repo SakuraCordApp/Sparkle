@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name        = "Sparkle"
-  s.version     = "2.9.6"
+  s.version     = "2.9.6-sakuracord.3"
   s.summary     = "A software update framework for macOS"
   s.description = "Sparkle is an easy-to-use software update framework for macOS."
   s.homepage    = "https://sparkle-project.org"
@@ -18,8 +18,10 @@ Pod::Spec.new do |s|
     'Andy Matuschak' => 'andy@andymatuschak.org',
   }
 
-  s.platform = :osx, '10.13'
-  s.source   = { :http => "https://github.com/SakuraCordApp/Sparkle/releases/download/#{s.version}/Sparkle-#{s.version}.tar.xz" }
+  s.platform = :osx, '27.0'
+  # RubyGems normalizes hyphenated prereleases to .pre.; GitHub tags keep the hyphen.
+  release_version = s.version.to_s.sub('.pre.', '-')
+  s.source   = { :http => "https://github.com/SakuraCordApp/Sparkle/releases/download/#{release_version}/Sparkle-#{release_version}.tar.xz" }
   s.source_files = 'Sparkle.framework/Versions/B/Headers/*.h'
 
   s.preserve_paths = ['bin/*', 'Symbols']
