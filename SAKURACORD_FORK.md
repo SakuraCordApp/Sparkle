@@ -43,8 +43,9 @@ operation-scoped API instead of enabling that application-wide opt-in.
 
 ## Verification and distribution
 
-Build this fork with macOS 27 and Xcode 27. The existing inherited GitHub release
-workflow still references an older toolchain; local release artifacts can be
+Build this fork with macOS 27 and Xcode 27. CI and the draft-release workflow use
+the `xcode-27` hosted runner and its selected toolchain. Draft assets and generated
+package download URLs target the SakuraCord fork. Local artifacts can be
 produced using `xcodebuild -project Sparkle.xcodeproj -scheme Distribution
 -configuration Release -derivedDataPath build CODE_SIGN_IDENTITY=- build`.
 The Distribution packaging step writes the SwiftPM archive and checksum.
