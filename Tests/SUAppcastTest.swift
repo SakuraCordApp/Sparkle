@@ -29,6 +29,49 @@ private let packageInstallationAppcastXML = """
 
 class SUAppcastTest: XCTestCase {
 
+    func testExplicitBuildSelectionRequiresSignedCompatibleExactArchive() throws {
+        let signature = Data(repeating: 0, count: 64).base64EncodedString()
+        func item(version: String = "10", metadata: String = "", enclosure: String = "") -> String {
+            """
+            <item><title>Build</title>\(metadata)<enclosure url="https://example.com/app.zip" sparkle:version="\(version)" sparkle:edSignature="\(signature)" length="123" \(enclosure)/></item>
+            """
+        }
+        func appcast(_ items: String, status: SPUAppcastSigningValidationStatus = .succeeded) throws -> SUAppcast {
+            let data = Data("""
+            <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>\(items)</channel></rss>
+            """.utf8)
+            let comparator = SUStandardVersionComparator.default
+            let resolver = SPUAppcastItemStateResolver(hostVersion: "20", applicationVersionComparator: comparator, standardVersionComparator: comparator)
+            return try SUAppcast(xmlData: data, relativeTo: nil, stateResolver: resolver, signingValidationStatus: status)
+        }
+        for version in ["10", "20", "30"] {
+            let selected = try SUAppcastDriver.selectExplicitUpdate(from: appcast(item(version: version)), version: version, allowedChannels: [], hostVersion: "20")
+            XCTAssertEqual(selected.versionString, version)
+            XCTAssertFalse(selected.isDeltaUpdate)
+        }
+        let selected = try appcast(item()).items[0]
+        selected.explicitlyRequestedVersion = "10"
+        let encoded = try NSKeyedArchiver.archivedData(withRootObject: selected, requiringSecureCoding: true)
+        let decoded = try XCTUnwrap(NSKeyedUnarchiver.unarchivedObject(ofClass: SUAppcastItem.self, from: encoded))
+        XCTAssertNil(decoded.explicitlyRequestedVersion, "A cached item must not restore operation authorization")
+        for status: SPUAppcastSigningValidationStatus in [.skipped, .failed] {
+            XCTAssertThrowsError(try SUAppcastDriver.selectExplicitUpdate(from: appcast(item(), status: status), version: "10", allowedChannels: [], hostVersion: "20"))
+        }
+        let rejected = [
+            item(version: "11"),
+            item() + item(),
+            item(metadata: "<sparkle:minimumSystemVersion>999.0</sparkle:minimumSystemVersion>"),
+            item(metadata: "<sparkle:maximumSystemVersion>1.0</sparkle:maximumSystemVersion>"),
+            item(metadata: "<sparkle:minimumUpdateVersion>21</sparkle:minimumUpdateVersion>"),
+            item(metadata: "<sparkle:channel>other</sparkle:channel>"),
+            item(enclosure: "sparkle:installationType=\"package\""),
+            item().replacingOccurrences(of: "sparkle:edSignature=\"\(signature)\"", with: ""),
+        ]
+        for xml in rejected {
+            XCTAssertThrowsError(try SUAppcastDriver.selectExplicitUpdate(from: appcast(xml), version: "10", allowedChannels: [], hostVersion: "20"), xml)
+        }
+    }
+
     func testParseAppcast() {
         let testURL = Bundle(for: SUAppcastTest.self).url(forResource: "testappcast", withExtension: "xml")!
         

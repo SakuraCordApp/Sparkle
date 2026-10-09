@@ -20,6 +20,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface SUAppcastItem (Private) <NSSecureCoding>
 
+@property (nonatomic, copy, nullable) NSString *explicitlyRequestedVersion;
+@property (nonatomic, readonly) BOOL hasEdDSASignature;
+
 /**
  Initializes with data from a dictionary provided by the RSS class and state resolver
 

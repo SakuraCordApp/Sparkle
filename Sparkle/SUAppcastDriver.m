@@ -30,6 +30,7 @@
 #import "SPUExtractSignedFeed.h"
 #import "SUSignatures.h"
 #import "SPUVerifierInformation.h"
+#import "SPUInstallationType.h"
 
 
 #include "AppKitPrevention.h"
@@ -44,6 +45,7 @@
 @implementation SUAppcastDriver
 {
     SUHost *_host;
+    NSString *_explicitlyRequestedVersion;
     SPUDownloadDriver *_downloadDriver;
     
     __weak id _updater;
@@ -56,6 +58,9 @@
     self = [super init];
     if (self != nil) {
         _host = host;
+        if ([(NSObject *)updater conformsToProtocol:@protocol(SPUExplicitUpdateRequest)]) {
+            _explicitlyRequestedVersion = [[(id<SPUExplicitUpdateRequest>)updater explicitlyRequestedVersion] copy];
+        }
         _updater = updater;
         _updaterDelegate = updaterDelegate;
         _delegate = delegate;
@@ -221,7 +226,19 @@
     SUAppcast *macOSAppcast = [SUAppcastDriver filterAppcast:loadedAppcast forMacOSAndAllowedChannels:allowedChannels];
     
     id<SUVersionComparison> applicationVersionComparator = [self versionComparator];
-    
+
+    if (_explicitlyRequestedVersion != nil) {
+        NSError *selectionError = nil;
+        SUAppcastItem *selected = [SUAppcastDriver selectExplicitUpdateFromAppcast:loadedAppcast version:_explicitlyRequestedVersion allowedChannels:allowedChannels hostVersion:_host.version error:&selectionError];
+        if (selected == nil) {
+            [delegate didFailToFetchAppcastWithError:selectionError];
+        } else {
+            selected.explicitlyRequestedVersion = _explicitlyRequestedVersion;
+            [delegate didFindValidUpdateWithAppcastItem:selected secondaryAppcastItem:nil];
+        }
+        return;
+    }
+
     BOOL background = _downloadDriver.inBackground;
     NSNumber *phasedUpdateGroup = background ? @([SUPhasedUpdateGroupInfo updateGroupForHost:_host]) : nil;
     
@@ -460,6 +477,34 @@
 }
 
 // Note: This method is used by unit tests
+// Kept separate to exercise the complete explicit-selection policy in unit tests.
++ (nullable SUAppcastItem *)selectExplicitUpdateFromAppcast:(SUAppcast *)appcast version:(NSString *)version allowedChannels:(NSSet<NSString *> *)allowedChannels hostVersion:(NSString *)hostVersion error:(NSError * __autoreleasing *)error
+#ifndef BUILDING_SPARKLE_TESTS
+SPU_OBJC_DIRECT
+#endif
+{
+    if (appcast.signingValidationStatus != SPUAppcastSigningValidationStatusSucceeded) {
+        if (error != NULL) *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUAppcastParseError userInfo:@{NSLocalizedDescriptionKey: @"The selected build requires a successfully verified signed feed."}];
+        return nil;
+    }
+    SUAppcast *macOSAppcast = [self filterAppcast:appcast forMacOSAndAllowedChannels:allowedChannels];
+    SUAppcast *supported = [self filterSupportedAppcast:macOSAppcast phasedUpdateGroup:nil skippedUpdate:nil currentDate:NSDate.date hostVersion:hostVersion versionComparator:SUStandardVersionComparator.defaultComparator testMinimumSystemRequirements:YES testMinimumAutoupdateVersion:NO];
+    SUAppcastItem *selected = nil;
+    for (SUAppcastItem *item in supported.items) {
+        if ([item.versionString isEqualToString:version] && [item.installationType isEqualToString:SPUInstallationTypeApplication] && item.fileURL != nil && !item.isDeltaUpdate && !item.isInformationOnlyUpdate && item.hasEdDSASignature) {
+            if (selected != nil) {
+                if (error != NULL) *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUAppcastParseError userInfo:@{NSLocalizedDescriptionKey: @"The selected build is ambiguous in the signed feed."}];
+                return nil;
+            }
+            selected = item;
+        }
+    }
+    if (selected == nil && error != NULL) {
+        *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUNoUpdateError userInfo:@{NSLocalizedDescriptionKey: @"The selected build is not available or is incompatible with this Mac."}];
+    }
+    return selected;
+}
+
 + (SUAppcast *)filterAppcast:(SUAppcast *)appcast forMacOSAndAllowedChannels:(NSSet<NSString *> *)allowedChannels
 #ifndef BUILDING_SPARKLE_TESTS
 SPU_OBJC_DIRECT

@@ -44,6 +44,10 @@ SUCodeSigningVerifierDefinitionAttribute
 + (NSString * _Nullable)teamIdentifierAtURL:(NSURL *)url;
 + (NSString * _Nullable)teamIdentifierFromMainExecutable;
 
+// Explicit replacement requires the connecting process to be the installed host,
+// even when ordinary ad-hoc update connections have no Team ID requirement.
++ (BOOL)validateExplicitUpdateConnection:(nullable NSXPCConnection *)connection hostBundle:(NSBundle *)hostBundle error:(NSError * __autoreleasing *)error;
+
 + (SUValidateConnectionStatus)validateConnection:(NSXPCConnection *)connection error:(NSError * __autoreleasing *)error;
 
 @end

@@ -47,6 +47,8 @@ static NSString *SUAppcastItemSigningValidationStatusKey = @"SUAppcastItemSignin
 
 @interface SUAppcastItem ()
 
+@property (nonatomic, copy, nullable) NSString *explicitlyRequestedVersion;
+
 @property (readonly, nonatomic, nullable) SUSignatures *signatures;
 @property (readonly, nonatomic, nullable) SUSignatures *releaseNotesSignatures;
 @property (readonly, nonatomic) uint64_t releaseNotesContentLength;
@@ -66,6 +68,13 @@ static NSString *SUAppcastItemSigningValidationStatusKey = @"SUAppcastItemSignin
     // Indicates the versions we update from that are informational-only
     NSSet<NSString *> *_informationalUpdateVersions;
 }
+
+- (BOOL)hasEdDSASignature
+{
+    return self.signatures.ed25519SignatureStatus == SUSigningInputStatusPresent;
+}
+
+@synthesize explicitlyRequestedVersion = _explicitlyRequestedVersion;
 
 @synthesize dateString = _dateString;
 @synthesize deltaUpdates = _deltaUpdates;

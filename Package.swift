@@ -2,10 +2,10 @@
 import PackageDescription
 
 // Version is technically not required here, SPM doesn't check
-let version = "2.9.6-sakuracord.2"
+let version = "2.9.6-sakuracord.3"
 // Tag is required to point towards the right asset. SPM requires the tag to follow semantic versioning to be able to resolve it.
-let tag = "2.9.6-sakuracord.2"
-let checksum = "205b396d7f250abc4c6b37b0e3f298dcaf5a74dfcea2e810d224fc5d1ebf2aee"
+let tag = "2.9.6-sakuracord.3"
+let checksum = "58249a630b10a455058ef0c4268018394f09ad51495f56fcc079c3d75bbfcb7e"
 let url = "https://github.com/SakuraCordApp/Sparkle/releases/download/\(tag)/Sparkle-for-Swift-Package-Manager.zip"
 
 let package = Package(

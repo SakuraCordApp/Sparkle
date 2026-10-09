@@ -37,6 +37,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		AC0000000000000000000001 /* SPUInstallationInputData.m in Sources */ = {isa = PBXBuildFile; fileRef = 7267E5AD1D3D8AB700D1BF90 /* SPUInstallationInputData.m */; };
 		142E0E0019A6954400E4312B /* Sparkle.framework in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = 8DC2EF5B0486A6940098B216 /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		142E0E0219A6A14700E4312B /* Sparkle.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = 8DC2EF5B0486A6940098B216 /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		142E0E0919A83AAC00E4312B /* SUBinaryDeltaTest.m in Sources */ = {isa = PBXBuildFile; fileRef = 142E0E0819A83AAC00E4312B /* SUBinaryDeltaTest.m */; };
@@ -3379,6 +3380,7 @@
 				5A5DD401249585E70045EB3E /* SUUpdateValidatorTest.swift in Sources */,
 				7267E5EC1D3D912900D1BF90 /* SUInstaller.m in Sources */,
 				5AF6C7541AEA49840014A3AB /* SUInstallerTest.m in Sources */,
+				AC0000000000000000000001 /* SPUInstallationInputData.m in Sources */,
 				14652F8219A9746000959E44 /* SULog.m in Sources */,
 				7267E5F81D3D91A800D1BF90 /* SUPipedUnarchiver.m in Sources */,
 				7267E5F71D3D919600D1BF90 /* SUPlainInstaller.m in Sources */,

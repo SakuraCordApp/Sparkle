@@ -98,6 +98,7 @@ static const NSTimeInterval SUDisplayProgressTimeDelay = 0.7;
     // Setting _performedStage1Installation on main thread must be synchronzied with reading it from new connection handler
     BOOL _performedStage1Installation;
     BOOL _receivedAppcastItemData;
+    NSString *_explicitlyRequestedVersion;
     
     BOOL _performedStage2Installation;
     BOOL _performedStage3Installation;
@@ -428,6 +429,9 @@ static const NSTimeInterval SUDisplayProgressTimeDelay = 0.7;
 - (void)handleMessageWithIdentifier:(int32_t)identifier data:(NSData *)data
 {
     if (identifier == SPUInstallationData && _updateDirectoryPath == nil) {
+        // Capture the actual caller before crossing to the main queue. The active
+        // connection or caller-supplied bundle metadata cannot authenticate a request.
+        NSXPCConnection *requestConnection = NSXPCConnection.currentConnection;
         dispatch_async(dispatch_get_main_queue(), ^{
             // Mark that we have received the installation data
             // Do not rely on eg: self->_updateDirectoryPath != nil because we may set it to nil again if an early stage fails (i.e, archive extraction)
@@ -447,6 +451,14 @@ static const NSTimeInterval SUDisplayProgressTimeDelay = 0.7;
             
             NSBundle *hostBundle = [NSBundle bundleWithPath:installationData.hostBundlePath];
             
+            if (installationData.explicitlyRequestedVersion != nil) {
+                NSError *authenticationError = nil;
+                if (hostBundle == nil || ![SUCodeSigningVerifier validateExplicitUpdateConnection:requestConnection hostBundle:hostBundle error:&authenticationError]) {
+                    [self cleanupAndExitWithStatus:EXIT_FAILURE error:authenticationError ?: [NSError errorWithDomain:SUSparkleErrorDomain code:SUInsufficientSigningError userInfo:@{NSLocalizedDescriptionKey: @"Cannot authenticate the explicit build replacement host."}]];
+                    return;
+                }
+            }
+
             NSString *bundleIdentifier = hostBundle.bundleIdentifier;
             if (bundleIdentifier == nil || ![bundleIdentifier isEqualToString:self->_hostBundleIdentifier]) {
                 [self cleanupAndExitWithStatus:EXIT_FAILURE error:[NSError errorWithDomain:SUSparkleErrorDomain code:SPUInstallerError userInfo:@{ NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Error: Failed to match host bundle identifiers %@ and %@", self->_hostBundleIdentifier, bundleIdentifier] }]];
@@ -635,6 +647,7 @@ static const NSTimeInterval SUDisplayProgressTimeDelay = 0.7;
             self->_extractionDirectory = extractionDirectory;
             self->_decryptionPassword = installationData.decryptionPassword;
             self->_host = [[SUHost alloc] initWithBundle:hostBundle];
+            self->_explicitlyRequestedVersion = [installationData.explicitlyRequestedVersion copy];
             self->_verifierInformation = [[SPUVerifierInformation alloc] initWithExpectedVersion:installationData.expectedVersion expectedContentLength:installationData.expectedContentLength];
             
             [self extractAndInstallUpdate];
@@ -709,7 +722,7 @@ static const NSTimeInterval SUDisplayProgressTimeDelay = 0.7;
     
     dispatch_async(_installerQueue, ^{
         NSError *installerError = nil;
-        id <SUInstallerProtocol> installer = [SUInstaller installerForHost:self->_host expectedInstallationType:self->_installationType updateDirectory:self->_extractionDirectory connectionCodeSigningValidationSkipped:connectionCodeSigningValidationSkipped homeDirectory:self->_homeDirectory userName:self->_userName error:&installerError];
+        id <SUInstallerProtocol> installer = [SUInstaller installerForHost:self->_host expectedInstallationType:self->_installationType updateDirectory:self->_extractionDirectory connectionCodeSigningValidationSkipped:connectionCodeSigningValidationSkipped homeDirectory:self->_homeDirectory userName:self->_userName explicitlyRequestedVersion:self->_explicitlyRequestedVersion error:&installerError];
         
         if (installer == nil) {
             dispatch_async(dispatch_get_main_queue(), ^{

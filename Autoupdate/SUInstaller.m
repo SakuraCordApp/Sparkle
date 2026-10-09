@@ -149,7 +149,7 @@
     return newAppDownloadPath;
 }
 
-+ (nullable id<SUInstallerProtocol>)installerForHost:(SUHost *)host expectedInstallationType:(NSString *)expectedInstallationType updateDirectory:(NSString *)updateDirectory connectionCodeSigningValidationSkipped:(BOOL)connectionCodeSigningValidationSkipped homeDirectory:(NSString *)homeDirectory userName:(NSString *)userName error:(NSError * __autoreleasing *)error
++ (nullable id<SUInstallerProtocol>)installerForHost:(SUHost *)host expectedInstallationType:(NSString *)expectedInstallationType updateDirectory:(NSString *)updateDirectory connectionCodeSigningValidationSkipped:(BOOL)connectionCodeSigningValidationSkipped homeDirectory:(NSString *)homeDirectory userName:(NSString *)userName explicitlyRequestedVersion:(nullable NSString *)explicitlyRequestedVersion error:(NSError * __autoreleasing *)error
 {
 #if SPARKLE_BUILD_PACKAGE_SUPPORT
     BOOL isPackage = NO;
@@ -286,7 +286,7 @@
                 installationPath = host.bundlePath;
             }
             
-            installer = [[SUPlainInstaller alloc] initWithHost:host bundlePath:newDownloadPath installationPath:installationPath];
+            installer = [[SUPlainInstaller alloc] initWithHost:host bundlePath:newDownloadPath installationPath:installationPath explicitlyRequestedVersion:explicitlyRequestedVersion];
         }
     }
     

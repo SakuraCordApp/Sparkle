@@ -12,7 +12,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-SPU_OBJC_DIRECT_MEMBERS @interface SPUInstallationInputData : NSObject <NSSecureCoding>
+#ifndef BUILDING_SPARKLE_TESTS
+#define SPUInstallationInputDataDefinitionAttribute SPU_OBJC_DIRECT_MEMBERS
+#else
+#define SPUInstallationInputDataDefinitionAttribute __attribute__((objc_runtime_name("SUTestInstallationInputData")))
+#endif
+
+SPUInstallationInputDataDefinitionAttribute @interface SPUInstallationInputData : NSObject <NSSecureCoding>
 
 /*
  * relaunchPath - path to application bundle to relaunch and listen for termination
@@ -34,6 +40,7 @@ SPU_OBJC_DIRECT_MEMBERS @interface SPUInstallationInputData : NSObject <NSSecure
 @property (nonatomic, copy, readonly, nullable) NSString *decryptionPassword;
 @property (nonatomic, copy, readonly, nullable) NSString *expectedVersion;
 @property (nonatomic, readonly) uint64_t expectedContentLength;
+@property (nonatomic, copy, nullable) NSString *explicitlyRequestedVersion;
 
 @end
 

@@ -11,6 +11,11 @@
 #import "SUCodeSigningVerifier.h"
 #import "SUAdHocCodeSigning.h"
 #import "SUFileManager.h"
+#import <Security/Security.h>
+
+@interface SUCodeSigningVerifier (ExplicitReplacementTests)
++ (BOOL)validateExplicitUpdateCode:(SecCodeRef)code hostBundle:(NSBundle *)hostBundle error:(NSError * __autoreleasing *)error;
+@end
 
 @interface SUCodeSigningVerifierTest : XCTestCase
 @end
@@ -184,6 +189,61 @@
 - (BOOL)codesignAppURL:(NSURL *)appURL
 {
     return [SUAdHocCodeSigning codeSignApplicationAtPath:appURL.path];
+}
+
+- (void)testExplicitReplacementAuthenticatesRunningAdHocHost
+{
+    NSURL *root = [_notSignedAppURL URLByDeletingLastPathComponent];
+    NSFileManager *manager = NSFileManager.defaultManager;
+    NSURL *hostURL = [root URLByAppendingPathComponent:@"ExplicitHost.app"];
+    NSURL *contents = [hostURL URLByAppendingPathComponent:@"Contents"];
+    NSURL *executables = [contents URLByAppendingPathComponent:@"MacOS"];
+    XCTAssertTrue([manager createDirectoryAtURL:executables withIntermediateDirectories:YES attributes:nil error:NULL]);
+    NSURL *infoURL = [contents URLByAppendingPathComponent:@"Info.plist"];
+    NSDictionary *info = @{@"CFBundleIdentifier": @"app.sakuracord.explicit-test", @"CFBundleExecutable": @"Host", @"CFBundlePackageType": @"APPL", @"CFBundleVersion": @"1"};
+    XCTAssertTrue([info writeToURL:infoURL atomically:YES]);
+    NSURL *source = [root URLByAppendingPathComponent:@"host.c"];
+    XCTAssertTrue([@"#include <unistd.h>\nint main(void) { sleep(60); return 0; }\n" writeToURL:source atomically:YES encoding:NSUTF8StringEncoding error:NULL]);
+    NSURL *executable = [executables URLByAppendingPathComponent:@"Host"];
+    NSTask *compiler = [[NSTask alloc] init];
+    compiler.executableURL = [NSURL fileURLWithPath:@"/usr/bin/clang"];
+    compiler.arguments = @[source.path, @"-o", executable.path];
+    XCTAssertTrue([compiler launchAndReturnError:NULL]);
+    [compiler waitUntilExit];
+    XCTAssertEqual(compiler.terminationStatus, 0);
+    XCTAssertTrue([self codesignAppURL:hostURL]);
+    // An identical signed clone passes the same designated requirement but must
+    // not be able to authorize replacement of the host at another path.
+    NSURL *cloneURL = [root URLByAppendingPathComponent:@"Clone.app"];
+    XCTAssertTrue([manager copyItemAtURL:hostURL toURL:cloneURL error:NULL]);
+    NSBundle *host = [NSBundle bundleWithURL:hostURL];
+    NSBundle *clone = [NSBundle bundleWithURL:cloneURL];
+    NSTask *process = [[NSTask alloc] init];
+    process.executableURL = executable;
+    XCTAssertTrue([process launchAndReturnError:NULL]);
+    @try {
+        SecCodeRef runningCode = NULL;
+        // PID is only used by the test harness. Production resolves from XPC's
+        // immutable audit token, then runs exactly this code/host validation.
+        NSDictionary *attributes = @{(__bridge NSString *)kSecGuestAttributePid: @(process.processIdentifier)};
+        XCTAssertEqual(SecCodeCopyGuestWithAttributes(NULL, (__bridge CFDictionaryRef)attributes, kSecCSDefaultFlags, &runningCode), errSecSuccess);
+        if (runningCode != NULL) {
+            NSError *error = nil;
+            XCTAssertTrue([SUCodeSigningVerifier validateExplicitUpdateCode:runningCode hostBundle:host error:&error], @"%@", error);
+            error = nil;
+            XCTAssertFalse([SUCodeSigningVerifier validateExplicitUpdateCode:runningCode hostBundle:clone error:&error]);
+            XCTAssertNotNil(error);
+            XCTAssertFalse([SUCodeSigningVerifier validateExplicitUpdateConnection:nil hostBundle:host error:NULL]);
+            NSMutableDictionary *tampered = [info mutableCopy];
+            tampered[@"CFBundleVersion"] = @"2";
+            XCTAssertTrue([tampered writeToURL:infoURL atomically:YES]);
+            XCTAssertFalse([SUCodeSigningVerifier validateExplicitUpdateCode:runningCode hostBundle:host error:NULL]);
+            CFRelease(runningCode);
+        }
+    } @finally {
+        [process terminate];
+        [process waitUntilExit];
+    }
 }
 
 - (void)testUnsignedApp

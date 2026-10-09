@@ -442,6 +442,60 @@ finally:
     return (resultError == nil);
 }
 
++ (BOOL)validateExplicitUpdateCode:(SecCodeRef)code hostBundle:(NSBundle *)hostBundle error:(NSError * __autoreleasing *)error
+#ifndef BUILDING_SPARKLE_TESTS
+SPU_OBJC_DIRECT
+#endif
+{
+    SecStaticCodeRef hostCode = NULL;
+    SecRequirementRef requirement = NULL;
+    CFDictionaryRef information = NULL;
+    OSStatus status = errSecCSReqFailed;
+    NSURL *expectedExecutable = hostBundle.executableURL.URLByResolvingSymlinksInPath;
+    if (expectedExecutable != nil) {
+        status = SecStaticCodeCreateWithPath((__bridge CFURLRef)hostBundle.bundleURL, kSecCSDefaultFlags, &hostCode);
+        if (status == errSecSuccess) status = SecStaticCodeCheckValidity(hostCode, kSecCSStrictValidate, NULL);
+        // Ad-hoc designated requirements bind the cdhash, rather than an absent Team ID.
+        if (status == errSecSuccess) status = SecCodeCopyDesignatedRequirement(hostCode, kSecCSDefaultFlags, &requirement);
+        if (status == errSecSuccess) status = SecCodeCheckValidity(code, kSecCSDefaultFlags, requirement);
+        if (status == errSecSuccess) status = SecCodeCopySigningInformation(code, kSecCSDefaultFlags, &information);
+        if (status == errSecSuccess) {
+            NSDictionary *signingInformation = (__bridge NSDictionary *)information;
+            NSURL *actualExecutable = signingInformation[(__bridge NSString *)kSecCodeInfoMainExecutable];
+            if (![actualExecutable.URLByResolvingSymlinksInPath isEqual:expectedExecutable]) status = errSecCSReqFailed;
+        }
+    }
+    if (information != NULL) CFRelease(information);
+    if (requirement != NULL) CFRelease(requirement);
+    if (hostCode != NULL) CFRelease(hostCode);
+    if (status != errSecSuccess && error != NULL) {
+        *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUInsufficientSigningError userInfo:@{NSLocalizedDescriptionKey: @"Explicit build replacement must be requested by the signed application being updated.", NSUnderlyingErrorKey: [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil]}];
+    }
+    return status == errSecSuccess;
+}
+
++ (BOOL)validateExplicitUpdateConnection:(nullable NSXPCConnection *)connection hostBundle:(NSBundle *)hostBundle error:(NSError * __autoreleasing *)error
+{
+    if (connection == nil || ![connection respondsToSelector:@selector(auditToken)]) {
+        if (error != NULL) *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUInsufficientSigningError userInfo:@{NSLocalizedDescriptionKey: @"Cannot authenticate the explicit build replacement request."}];
+        return NO;
+    }
+    // Reuse Sparkle's audit-token capability; never fall back to a PID, which can
+    // be reused, or to the client's self-reported bundle identifier/version.
+    audit_token_t auditToken = connection.auditToken;
+    NSDictionary *attributes = @{(__bridge NSString *)kSecGuestAttributeAudit: [NSData dataWithBytes:&auditToken length:sizeof(auditToken)]};
+    SecCodeRef code = NULL;
+    OSStatus status = SecCodeCopyGuestWithAttributes(NULL, (__bridge CFDictionaryRef)attributes, kSecCSDefaultFlags, &code);
+    if (status != errSecSuccess) {
+        if (code != NULL) CFRelease(code);
+        if (error != NULL) *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+        return NO;
+    }
+    BOOL valid = [self validateExplicitUpdateCode:code hostBundle:hostBundle error:error];
+    CFRelease(code);
+    return valid;
+}
+
 + (SUValidateConnectionStatus)validateConnection:(NSXPCConnection *)connection error:(NSError * __autoreleasing *)error
 {
     // Check if code signing requirement is required

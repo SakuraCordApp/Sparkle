@@ -13,6 +13,11 @@ NS_ASSUME_NONNULL_BEGIN
 @class SUAppcastItem, SUHost, SUAppcast;
 @protocol SPUUpdaterDelegate;
 
+// Internal operation state, snapshotted when the user-initiated driver is created.
+@protocol SPUExplicitUpdateRequest <NSObject>
+@property (nonatomic, readonly, copy, nullable) NSString *explicitlyRequestedVersion;
+@end
+
 @protocol SUAppcastDriverDelegate <NSObject>
 
 - (void)didFailToFetchAppcastWithError:(NSError *)error;

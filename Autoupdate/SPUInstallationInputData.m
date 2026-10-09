@@ -23,6 +23,7 @@ static NSString *SUExpectedContentLength = @"SUExpectedContentLength";
 
 @implementation SPUInstallationInputData
 
+@synthesize explicitlyRequestedVersion = _explicitlyRequestedVersion;
 @synthesize relaunchPath = _relaunchPath;
 @synthesize hostBundlePath = _hostBundlePath;
 @synthesize updateURLBookmarkData = _updateURLBookmarkData;
@@ -84,11 +85,19 @@ static NSString *SUExpectedContentLength = @"SUExpectedContentLength";
     NSString *expectedVersion = [decoder decodeObjectOfClass:[NSString class] forKey:SUExpectedVersionKey];
     uint64_t expectedContentLength = (uint64_t)[decoder decodeInt64ForKey:SUExpectedContentLength];
     
-    return [self initWithRelaunchPath:relaunchPath hostBundlePath:hostBundlePath updateURLBookmarkData:updateURLBookmarkData installationType:installationType signatures:signatures decryptionPassword:decryptionPassword expectedVersion:expectedVersion expectedContentLength:expectedContentLength];
+    self = [self initWithRelaunchPath:relaunchPath hostBundlePath:hostBundlePath updateURLBookmarkData:updateURLBookmarkData installationType:installationType signatures:signatures decryptionPassword:decryptionPassword expectedVersion:expectedVersion expectedContentLength:expectedContentLength];
+    if (self != nil) {
+        _explicitlyRequestedVersion = [decoder decodeObjectOfClass:NSString.class forKey:@"SUExplicitlyRequestedVersion"];
+        if (_explicitlyRequestedVersion != nil && (_explicitlyRequestedVersion.length == 0 || ![_explicitlyRequestedVersion isEqualToString:expectedVersion] || ![installationType isEqualToString:SPUInstallationTypeApplication])) {
+            return nil;
+        }
+    }
+    return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)coder
 {
+    [coder encodeObject:_explicitlyRequestedVersion forKey:@"SUExplicitlyRequestedVersion"];
     [coder encodeObject:_relaunchPath forKey:SURelaunchPathKey];
     [coder encodeObject:_hostBundlePath forKey:SUHostBundlePathKey];
     [coder encodeObject:_updateURLBookmarkData forKey:SUUpdateURLBookmarkDataKey];

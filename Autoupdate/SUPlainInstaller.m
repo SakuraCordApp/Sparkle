@@ -24,6 +24,7 @@
     SUHost *_host;
     NSString *_bundlePath;
     NSString *_installationPath;
+    NSString *_explicitlyRequestedVersion;
     NSURL *_temporaryOldDirectory;
     // We get an obj-c warning if we use 'newTemporaryDirectory' name about new + ownership stuff, so use 'temporaryNewDirectory' instead
     NSURL *_temporaryNewDirectory;
@@ -32,11 +33,12 @@
     BOOL _canPerformSafeAtomicSwap;
 }
 
-- (instancetype)initWithHost:(SUHost *)host bundlePath:(NSString *)bundlePath installationPath:(NSString *)installationPath
+- (instancetype)initWithHost:(SUHost *)host bundlePath:(NSString *)bundlePath installationPath:(NSString *)installationPath explicitlyRequestedVersion:(nullable NSString *)explicitlyRequestedVersion
 {
     self = [super init];
     if (self != nil) {
         _host = host;
+        _explicitlyRequestedVersion = [explicitlyRequestedVersion copy];
         _bundlePath = [bundlePath copy];
         _installationPath = [installationPath copy];
     }
@@ -333,10 +335,14 @@
     
     id<SUVersionComparison> comparator = [[SUStandardVersionComparator alloc] init];
     BOOL isVersionDowngrade = updateVersion != nil && [comparator compareVersion:hostVersion toVersion:updateVersion] == NSOrderedDescending;
-    if (!updateVersion || (isVersionDowngrade && !allowsVersionDowngrades)) {
+    BOOL explicitlyAuthorized = _explicitlyRequestedVersion.length > 0 && [updateVersion isEqualToString:_explicitlyRequestedVersion];
+    BOOL wrongExplicitVersion = _explicitlyRequestedVersion != nil && !explicitlyAuthorized;
+    if (!updateVersion || wrongExplicitVersion || (isVersionDowngrade && !allowsVersionDowngrades && !explicitlyAuthorized)) {
         
         if (error != NULL) {
-            NSString *errorMessage = [NSString stringWithFormat:@"For security reasons, updates that downgrade version of the application are not allowed. Refusing to downgrade app from version %@ to %@. Aborting update.", hostVersion, updateVersion];
+            NSString *errorMessage = wrongExplicitVersion
+                ? [NSString stringWithFormat:@"The downloaded bundle version %@ does not match the explicitly selected build %@. Aborting update.", updateVersion, _explicitlyRequestedVersion]
+                : [NSString stringWithFormat:@"For security reasons, updates that downgrade version of the application are not allowed. Refusing to downgrade app from version %@ to %@. Aborting update.", hostVersion, updateVersion];
             
             *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUDowngradeError userInfo:@{ NSLocalizedDescriptionKey: errorMessage }];
         }

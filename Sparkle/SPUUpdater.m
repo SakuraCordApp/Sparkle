@@ -34,6 +34,7 @@
 #import "SUSignatures.h"
 #import "SPUUserAgent+Private.h"
 #import "SPUGentleUserDriverReminders.h"
+#import "SUAppcastDriver.h"
 
 
 #include "AppKitPrevention.h"
@@ -45,11 +46,12 @@ NSString *const SUUpdaterWillRestartNotification = @"SUUpdaterWillRestartNotific
 NSString *const SUUpdaterAppcastItemNotificationKey = @"SUUpdaterAppcastItemNotificationKey";
 NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotificationKey";
 
-@interface SPUUpdater () <SPUUpdaterCycleDelegate, SPUUpdaterTimerDelegate>
+@interface SPUUpdater () <SPUUpdaterCycleDelegate, SPUUpdaterTimerDelegate, SPUExplicitUpdateRequest>
 
 // These two properties are needed for KVO
 @property (nonatomic) BOOL sessionInProgress;
 @property (nonatomic) BOOL canCheckForUpdates;
+@property (nonatomic, copy, nullable) NSString *explicitlyRequestedVersion;
 
 @end
 
@@ -80,6 +82,8 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     BOOL _loggedUpdateSecurityPolicyWarning;
     BOOL _updatingMainBundle;
 }
+
+@synthesize explicitlyRequestedVersion = _explicitlyRequestedVersion;
 
 @synthesize userAgentString = _userAgentString;
 @synthesize httpHeaders = _httpHeaders;
@@ -681,6 +685,22 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     [self _checkForUpdatesInBackground];
 }
 
+- (BOOL)checkForUpdatesForVersion:(NSString *)version error:(NSError * _Nullable __autoreleasing * _Nullable)error
+{
+    if (!NSThread.isMainThread || version.length == 0 || !_startedUpdater || _sessionInProgress || _driver != nil || _showingPermissionRequest || _resumableUpdate != nil || !_host.requiresSignedAppcast) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUIncorrectAPIUsageError userInfo:@{NSLocalizedDescriptionKey: @"An explicitly selected build requires a started, idle updater, a signed feed, and a nonempty version on the main thread."}];
+        }
+        return NO;
+    }
+    self.explicitlyRequestedVersion = version;
+    [self checkForUpdates];
+    // The appcast driver snapshots this during construction. Never retain authorization
+    // on the updater or permit it to affect a subsequent automatic check.
+    self.explicitlyRequestedVersion = nil;
+    return YES;
+}
+
 - (void)checkForUpdates
 {
     if (![NSThread isMainThread]) {
@@ -722,6 +742,7 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
     [self setSessionInProgress:YES];
     [self setCanCheckForUpdates:NO];
     
+    BOOL explicitlyRequestedUpdate = self.explicitlyRequestedVersion != nil;
     id <SPUUpdateDriver> theUpdateDriver = [[SPUUserInitiatedUpdateDriver alloc] initWithHost:_host applicationBundle:_applicationBundle updater:self userDriver:_userDriver updaterDelegate:_delegate];
     
     NSString *bundleIdentifier = _host.bundle.bundleIdentifier;
@@ -732,6 +753,20 @@ NSString *const SUUpdaterAppcastNotificationKey = @"SUUpdaterAppCastNotification
         dispatch_async(dispatch_get_main_queue(), ^{
             __typeof__(self) strongSelf = weakSelf;
             if (strongSelf != nil) {
+                if (explicitlyRequestedUpdate && installerInProgress) {
+                    // Never substitute an already staged installation for the selected build.
+                    [strongSelf setSessionInProgress:NO];
+                    [strongSelf setCanCheckForUpdates:YES];
+                    NSError *error = [NSError errorWithDomain:SUSparkleErrorDomain code:SUInstallationError userInfo:@{NSLocalizedDescriptionKey: @"Another update is already being installed. Finish it before selecting a build."}];
+                    id<SPUUpdaterDelegate> delegate = strongSelf->_delegate;
+                    if ([delegate respondsToSelector:@selector(updater:didAbortWithError:)]) {
+                        [delegate updater:strongSelf didAbortWithError:error];
+                    }
+                    if ([delegate respondsToSelector:@selector(updater:didFinishUpdateCycleForUpdateCheck:error:)]) {
+                        [delegate updater:strongSelf didFinishUpdateCycleForUpdateCheck:SPUUpdateCheckUpdates error:error];
+                    }
+                    return;
+                }
                 [strongSelf checkForUpdatesWithDriver:theUpdateDriver updateCheck:SPUUpdateCheckUpdates installerInProgress:installerInProgress];
             }
         });

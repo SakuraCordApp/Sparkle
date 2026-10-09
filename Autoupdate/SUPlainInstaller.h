@@ -9,6 +9,8 @@
 #import <Foundation/Foundation.h>
 #import "SUInstallerProtocol.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @class SUHost;
 @protocol SUVersionComparison;
 
@@ -19,6 +21,8 @@ SPU_OBJC_DIRECT_MEMBERS @interface SUPlainInstaller : NSObject <SUInstallerProto
  @param bundlePath The path to the new bundle that will be installed.
  @param installationPath The path the new bundlePath will be installed to.
  */
-- (instancetype)initWithHost:(SUHost *)host bundlePath:(NSString *)bundlePath installationPath:(NSString *)installationPath;
+- (instancetype)initWithHost:(SUHost *)host bundlePath:(NSString *)bundlePath installationPath:(NSString *)installationPath explicitlyRequestedVersion:(nullable NSString *)explicitlyRequestedVersion;
 
 @end
+
+NS_ASSUME_NONNULL_END

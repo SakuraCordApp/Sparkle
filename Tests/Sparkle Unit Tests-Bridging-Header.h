@@ -12,6 +12,7 @@
 #import "SUAppcast.h"
 #import "SUAppcast+Private.h"
 #import "SUAppcastItem.h"
+#import "SUAppcastItem+Private.h"
 #import "SUAppcastDriver.h"
 #import "SUVersionComparisonProtocol.h"
 #import "SUStandardVersionComparator.h"
@@ -39,6 +40,8 @@ static const char *SUAppleQuarantineIdentifier = "com.apple.quarantine";
 @end
 
 @interface SUAppcastDriver (Private)
+
++ (nullable SUAppcastItem *)selectExplicitUpdateFromAppcast:(SUAppcast *)appcast version:(NSString *)version allowedChannels:(NSSet<NSString *> *)allowedChannels hostVersion:(NSString *)hostVersion error:(NSError **)error;
 
 + (SUAppcastItem *)bestItemFromAppcastItems:(NSArray *)appcastItems getDeltaItem:(SUAppcastItem *_Nullable __autoreleasing *_Nullable)deltaItem withHostVersion:(NSString *)hostVersion comparator:(id<SUVersionComparison>)comparator;
 

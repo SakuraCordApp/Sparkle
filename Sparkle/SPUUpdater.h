@@ -109,6 +109,17 @@ SU_EXPORT NS_SWIFT_UI_ACTOR @interface SPUUpdater : NSObject
 - (void)checkForUpdates;
 
 /**
+ Checks the configured signed appcast for the exact build explicitly selected by the user.
+ The normal update prompt and archive/bundle verification still apply, including for older
+ or equal versions. Only full application archives from successfully verified feeds qualify.
+ Call on the main thread after starting the updater. An existing update session or downloaded
+ update must finish first. Authorization applies only to this operation and this version.
+ The signed host application must connect directly to the installer; external updater
+ processes and installer-connection forwarding services cannot authorize replacement.
+ */
+- (BOOL)checkForUpdatesForVersion:(NSString *)version error:(NSError * _Nullable __autoreleasing * _Nullable)error;
+
+/**
  Checks for new updates in the background.
  
  You usually should not call this method directly. By default Sparkle calls this method automatically

@@ -19,6 +19,7 @@
 #import "SPUDownloadedUpdate.h"
 #import "SPUInformationalUpdate.h"
 #import "SUAppcastItem.h"
+#import "SUAppcastItem+Private.h"
 #import "SULocalizations.h"
 #import "SPUInstallationType.h"
 #import "SUPhasedUpdateGroupInfo.h"
@@ -382,6 +383,11 @@
 
 - (void)abortUpdateAndShowNextUpdateImmediately:(BOOL)shouldShowUpdateImmediately error:(nullable NSError *)error
 {
+    // Dismissal ends the explicit selection. A later normal/automatic check must
+    // not resume its in-memory authorization or silently select that build.
+    if (_resumableUpdate.updateItem.explicitlyRequestedVersion != nil) {
+        [self clearDownloadedUpdate];
+    }
     [_installerDriver abortInstall];
     
     void (^basicDriverAbort)(void) = ^{
